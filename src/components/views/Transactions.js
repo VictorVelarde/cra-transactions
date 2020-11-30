@@ -1,26 +1,32 @@
 import React from 'react';
 import { useEffect } from 'react';
-import { useDispatch } from 'react-redux';
-import { addLayer, removeLayer, addSource, removeSource } from '@carto/react/redux';
+import { useSelector, useDispatch } from 'react-redux';
+import {
+  addLayer,
+  removeLayer,
+  addSource,
+  removeSource,
+  selectSourceById,
+} from '@carto/react/redux';
+import { buildQueryFilters } from '@carto/react/api';
 
 import { AggregationTypes } from '@carto/react/widgets';
 import { FormulaWidget, CategoryWidget, HistogramWidget } from '@carto/react/widgets';
 
-import { makeStyles } from '@material-ui/core/styles';
-import { Divider, Grid } from '@material-ui/core';
+import { Divider } from '@material-ui/core';
 
 import { currencyFormatter, numberFormatter } from 'utils/formatter';
 
-const useStyles = makeStyles((theme) => ({
-  root: {},
-}));
-
 export default function Transactions() {
-  const dispatch = useDispatch();
-  const classes = useStyles();
-
-  // Create a pure source, just for widgets
   const TRANSACTIONS_SOURCE_ID = 'transactionsSource';
+  const AGGREGATED_SOURCE_ID = `transactionsPerRegionSource`;
+
+  const transactionsSource = useSelector((state) =>
+    selectSourceById(state, TRANSACTIONS_SOURCE_ID)
+  );
+  const dispatch = useDispatch();
+
+  // 1. Create a pure source, just for widgets
   const TRANSACTIONS_SQL_SOURCE = `
     SELECT 
       amount, 
@@ -28,8 +34,22 @@ export default function Transactions() {
       the_geom_webmercator 
     FROM transactions`;
 
-  // Create a source for the aggregations per region (for the layer)
-  const AGGREGATED_SOURCE_ID = `transactionsPerRegionSource`;
+  useEffect(() => {
+    // Add the disaggregated, original source
+    dispatch(
+      addSource({
+        id: TRANSACTIONS_SOURCE_ID,
+        data: TRANSACTIONS_SQL_SOURCE,
+        type: 'sql',
+      })
+    );
+    // Cleanup
+    return function cleanup() {
+      dispatch(removeSource(TRANSACTIONS_SOURCE_ID));
+    };
+  }, [dispatch, TRANSACTIONS_SOURCE_ID, TRANSACTIONS_SQL_SOURCE]);
+
+  // 2. Create a source for the aggregations per region (for the layer)
   const AGGREGATED_SQL_SOURCE = `
     SELECT 
       r.cartodb_id,
@@ -47,21 +67,6 @@ export default function Transactions() {
       r.the_geom_webmercator
   `;
   const AGGREGATED_LAYER_ID = `transactionsPerRegion`;
-
-  useEffect(() => {
-    // Add the disaggregated, original source
-    dispatch(
-      addSource({
-        id: TRANSACTIONS_SOURCE_ID,
-        data: TRANSACTIONS_SQL_SOURCE,
-        type: 'sql',
-      })
-    );
-    // Cleanup
-    return function cleanup() {
-      dispatch(removeSource(TRANSACTIONS_SOURCE_ID));
-    };
-  }, [dispatch, TRANSACTIONS_SOURCE_ID, TRANSACTIONS_SQL_SOURCE]);
 
   useEffect(() => {
     // Add the aggregated source
@@ -128,6 +133,13 @@ export default function Transactions() {
         viewportFilter
         onError={console.error}
       ></HistogramWidget>
+
+      <Divider />
+
+      {/* SQL for debugging */}
+      <div style={{ padding: 20 }}>
+        {transactionsSource && buildQueryFilters(transactionsSource)}
+      </div>
     </div>
   );
 }
