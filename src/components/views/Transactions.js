@@ -2,8 +2,14 @@ import React from 'react';
 import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { addLayer, removeLayer, addSource, removeSource } from '@carto/react/redux';
+
+import { AggregationTypes } from '@carto/react/widgets';
+import { FormulaWidget, CategoryWidget, HistogramWidget } from '@carto/react/widgets';
+
 import { makeStyles } from '@material-ui/core/styles';
-import { Grid } from '@material-ui/core';
+import { Divider, Grid } from '@material-ui/core';
+
+import { currencyFormatter, numberFormatter } from 'utils/formatter';
 
 const useStyles = makeStyles((theme) => ({
   root: {},
@@ -21,8 +27,8 @@ export default function Transactions() {
       r.cartodb_id,
       r.name, 
       r.the_geom_webmercator,
-      SUM(t.amount) as sum,
-      AVG(t.amount) as avg,
+      SUM(t.amount) as amount_sum,
+      AVG(t.amount) as amount_avg,
       COUNT(*) as count
     FROM regions as r JOIN 
       transactions as t
@@ -60,7 +66,17 @@ export default function Transactions() {
 
   return (
     <Grid container direction='row' className={classes.root}>
-      <Grid item>Hello World</Grid>
+      <FormulaWidget
+        title='Total amount'
+        dataSource={SOURCE_ID}
+        column='amount_sum'
+        operation={AggregationTypes.SUM}
+        formatter={currencyFormatter}
+        viewportFilter
+        onError={console.error}
+      ></FormulaWidget>
+
+      <Divider />
     </Grid>
   );
 }
