@@ -21,7 +21,22 @@ export default function Transactions() {
     dispatch(
       addSource({
         id: SOURCE_ID,
-        data: `SELECT * FROM regions`,
+        data: `
+          SELECT 
+            r.cartodb_id,
+            r.name, 
+            r.the_geom_webmercator,
+            SUM(t.amount) as sum,
+            AVG(t.amount) as avg,
+            COUNT(*) as count
+          FROM regions as r JOIN 
+            transactions as t
+            ON ST_Intersects(r.the_geom_webmercator, t.the_geom_webmercator)
+          GROUP BY 
+            r.cartodb_id,
+            r.name, 
+            r.the_geom_webmercator
+          `,
         type: 'sql',
       })
     );
