@@ -19,39 +19,56 @@ export default function Transactions() {
   const dispatch = useDispatch();
   const classes = useStyles();
 
-  const AGGREGATED_SOURCE_ID = `transactionsPerRegionSource`;
-  const AGGREGATED_LAYER_ID = `transactionsPerRegion`;
-
-  let transactions_sql = `
+  // Create a pure source, just for widgets
+  const TRANSACTIONS_SOURCE_ID = 'transactionsSource';
+  const TRANSACTIONS_SQL_SOURCE = `
     SELECT 
-      t.amount, 
-      t.type, 
-      t.the_geom_webmercator 
-    FROM transactions as t`;
+      amount, 
+      type, 
+      the_geom_webmercator 
+    FROM transactions`;
 
-  const SQL_SOURCE = `
+  // Create a source for the aggregations per region (for the layer)
+  const AGGREGATED_SOURCE_ID = `transactionsPerRegionSource`;
+  const AGGREGATED_SQL_SOURCE = `
     SELECT 
       r.cartodb_id,
       r.name, 
       r.the_geom_webmercator,
-      SUM(t.amount) as amount_sum,
-      AVG(t.amount) as amount_avg,
-      COUNT(*) as count
+      SUM(t.amount) as transactions_sum,
+      AVG(t.amount) as transactions_avg,
+      COUNT(*) as transactions_count
     FROM regions as r JOIN 
-      (${transactions_sql}) as t
+      (${TRANSACTIONS_SQL_SOURCE}) as t
       ON ST_Intersects(r.the_geom_webmercator, t.the_geom_webmercator)
     GROUP BY 
       r.cartodb_id,
       r.name, 
       r.the_geom_webmercator
   `;
+  const AGGREGATED_LAYER_ID = `transactionsPerRegion`;
+
+  useEffect(() => {
+    // Add the disaggregated, original source
+    dispatch(
+      addSource({
+        id: TRANSACTIONS_SOURCE_ID,
+        data: TRANSACTIONS_SQL_SOURCE,
+        type: 'sql',
+      })
+    );
+    // Cleanup
+    return function cleanup() {
+      dispatch(removeSource(TRANSACTIONS_SOURCE_ID));
+    };
+  }, [dispatch, TRANSACTIONS_SOURCE_ID, TRANSACTIONS_SQL_SOURCE]);
 
   useEffect(() => {
     // Add the aggregated source
     dispatch(
       addSource({
         id: AGGREGATED_SOURCE_ID,
-        data: SQL_SOURCE,
+        data: AGGREGATED_SQL_SOURCE,
         type: 'sql',
       })
     );
@@ -69,14 +86,14 @@ export default function Transactions() {
       dispatch(removeLayer(AGGREGATED_LAYER_ID));
       dispatch(removeSource(AGGREGATED_SOURCE_ID));
     };
-  }, [dispatch, AGGREGATED_SOURCE_ID, AGGREGATED_LAYER_ID, SQL_SOURCE]);
+  }, [dispatch, AGGREGATED_SOURCE_ID, AGGREGATED_LAYER_ID, AGGREGATED_SQL_SOURCE]);
 
   return (
-    <Grid container direction='row' className={classes.root}>
+    <div>
       <FormulaWidget
         title='Total amount'
-        dataSource={AGGREGATED_SOURCE_ID}
-        column='amount_sum'
+        dataSource={TRANSACTIONS_SOURCE_ID}
+        column='amount'
         operation={AggregationTypes.SUM}
         formatter={currencyFormatter}
         viewportFilter
@@ -84,6 +101,33 @@ export default function Transactions() {
       ></FormulaWidget>
 
       <Divider />
-    </Grid>
+
+      <CategoryWidget
+        id='transactionsByType'
+        title='Amount by transaction type'
+        dataSource={TRANSACTIONS_SOURCE_ID}
+        column='type'
+        operationColumn='amount'
+        operation={AggregationTypes.SUM}
+        formatter={currencyFormatter}
+        viewportFilter
+        onError={console.error}
+      />
+
+      <Divider />
+
+      <HistogramWidget
+        id='transactionsByAmount'
+        title='Transactions by amount'
+        dataSource={TRANSACTIONS_SOURCE_ID}
+        formatter={numberFormatter}
+        xAxisFormatter={currencyFormatter}
+        operation={AggregationTypes.COUNT}
+        column='amount'
+        ticks={[1200000, 1300000, 1400000, 1500000, 1600000, 1700000, 1800000]}
+        viewportFilter
+        onError={console.error}
+      ></HistogramWidget>
+    </div>
   );
 }
