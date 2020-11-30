@@ -26,8 +26,8 @@ export default function Transactions() {
   );
   const dispatch = useDispatch();
 
-  // 1. Create a pure source, just for widgets
-  const TRANSACTIONS_SQL_SOURCE = `
+  // 1. Create a pure source, just for the widgets & filtering
+  const TRANSACTIONS_SQL = `
     SELECT 
       amount, 
       type, 
@@ -39,7 +39,7 @@ export default function Transactions() {
     dispatch(
       addSource({
         id: TRANSACTIONS_SOURCE_ID,
-        data: TRANSACTIONS_SQL_SOURCE,
+        data: TRANSACTIONS_SQL,
         type: 'sql',
       })
     );
@@ -47,33 +47,47 @@ export default function Transactions() {
     return function cleanup() {
       dispatch(removeSource(TRANSACTIONS_SOURCE_ID));
     };
-  }, [dispatch, TRANSACTIONS_SOURCE_ID, TRANSACTIONS_SQL_SOURCE]);
+  }, [dispatch, TRANSACTIONS_SOURCE_ID, TRANSACTIONS_SQL]);
 
-  // 2. Create a source for the aggregations per region (for the layer)
-  const AGGREGATED_SQL_SOURCE = `
-    SELECT 
-      r.cartodb_id,
-      r.name, 
-      r.the_geom_webmercator,
-      SUM(t.amount) as transactions_sum,
-      AVG(t.amount) as transactions_avg,
-      COUNT(*) as transactions_count
-    FROM regions as r JOIN 
-      (${TRANSACTIONS_SQL_SOURCE}) as t
-      ON ST_Intersects(r.the_geom_webmercator, t.the_geom_webmercator)
-    GROUP BY 
-      r.cartodb_id,
-      r.name, 
-      r.the_geom_webmercator
-  `;
+  // 2. Create a source + layer for the aggregations per region
+
   const AGGREGATED_LAYER_ID = `transactionsPerRegion`;
+
+  const buildDynamicAggregatedSource = () => {
+    let selectedTransactions;
+
+    if (transactionsSource) {
+      selectedTransactions = buildQueryFilters(transactionsSource);
+    } else {
+      selectedTransactions = TRANSACTIONS_SQL;
+    }
+
+    return `
+      SELECT 
+        r.cartodb_id,
+        r.name, 
+        r.the_geom_webmercator,
+        SUM(t.amount) as transactions_sum,
+        AVG(t.amount) as transactions_avg,
+        COUNT(*) as transactions_count
+      FROM regions as r JOIN 
+        (${selectedTransactions}) as t
+        ON ST_Intersects(r.the_geom_webmercator, t.the_geom_webmercator)
+      GROUP BY 
+        r.cartodb_id,
+        r.name, 
+        r.the_geom_webmercator
+    `;
+  };
+  const AGGREGATED_SQL = buildDynamicAggregatedSource();
 
   useEffect(() => {
     // Add the aggregated source
+
     dispatch(
       addSource({
         id: AGGREGATED_SOURCE_ID,
-        data: AGGREGATED_SQL_SOURCE,
+        data: AGGREGATED_SQL,
         type: 'sql',
       })
     );
@@ -91,7 +105,7 @@ export default function Transactions() {
       dispatch(removeLayer(AGGREGATED_LAYER_ID));
       dispatch(removeSource(AGGREGATED_SOURCE_ID));
     };
-  }, [dispatch, AGGREGATED_SOURCE_ID, AGGREGATED_LAYER_ID, AGGREGATED_SQL_SOURCE]);
+  }, [dispatch, AGGREGATED_SOURCE_ID, AGGREGATED_LAYER_ID, AGGREGATED_SQL]);
 
   return (
     <div>
