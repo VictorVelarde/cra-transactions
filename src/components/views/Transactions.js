@@ -19,8 +19,15 @@ export default function Transactions() {
   const dispatch = useDispatch();
   const classes = useStyles();
 
-  const SOURCE_ID = `transactionsPerRegionSource`;
-  const LAYER_ID = `transactionsPerRegion`;
+  const AGGREGATED_SOURCE_ID = `transactionsPerRegionSource`;
+  const AGGREGATED_LAYER_ID = `transactionsPerRegion`;
+
+  let transactions_sql = `
+    SELECT 
+      t.amount, 
+      t.type, 
+      t.the_geom_webmercator 
+    FROM transactions as t`;
 
   const SQL_SOURCE = `
     SELECT 
@@ -31,44 +38,44 @@ export default function Transactions() {
       AVG(t.amount) as amount_avg,
       COUNT(*) as count
     FROM regions as r JOIN 
-      transactions as t
+      (${transactions_sql}) as t
       ON ST_Intersects(r.the_geom_webmercator, t.the_geom_webmercator)
     GROUP BY 
       r.cartodb_id,
       r.name, 
       r.the_geom_webmercator
-    `;
+  `;
 
   useEffect(() => {
-    // Add the source
+    // Add the aggregated source
     dispatch(
       addSource({
-        id: SOURCE_ID,
+        id: AGGREGATED_SOURCE_ID,
         data: SQL_SOURCE,
         type: 'sql',
       })
     );
 
-    // Add the layer
+    // Add the aggregated layer
     dispatch(
       addLayer({
-        id: LAYER_ID,
-        source: SOURCE_ID,
+        id: AGGREGATED_LAYER_ID,
+        source: AGGREGATED_SOURCE_ID,
       })
     );
 
     // Cleanup
     return function cleanup() {
-      dispatch(removeLayer(LAYER_ID));
-      dispatch(removeSource(SOURCE_ID));
+      dispatch(removeLayer(AGGREGATED_LAYER_ID));
+      dispatch(removeSource(AGGREGATED_SOURCE_ID));
     };
-  }, [dispatch, SOURCE_ID, LAYER_ID, SQL_SOURCE]);
+  }, [dispatch, AGGREGATED_SOURCE_ID, AGGREGATED_LAYER_ID, SQL_SOURCE]);
 
   return (
     <Grid container direction='row' className={classes.root}>
       <FormulaWidget
         title='Total amount'
-        dataSource={SOURCE_ID}
+        dataSource={AGGREGATED_SOURCE_ID}
         column='amount_sum'
         operation={AggregationTypes.SUM}
         formatter={currencyFormatter}
