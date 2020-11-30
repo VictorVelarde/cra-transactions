@@ -4,6 +4,7 @@ import { OAuthCallback } from '@carto/react/oauth';
 import Main from 'components/views/Main';
 import NotFound from 'components/views/NotFound';
 
+import Transactions from 'components/views/Transactions.js';
 // Auto import
 const routes = [
   {
@@ -11,6 +12,8 @@ const routes = [
     element: <Main />,
     children: [
       // { path: '/', element: <Navigate to='/<your default view>' /> },
+      { path: '/Transactions', element: <Transactions /> },
+
       // Auto import routes
     ],
   },

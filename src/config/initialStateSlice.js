@@ -11,7 +11,7 @@ export const initialState = {
   },
   basemap: POSITRON,
   credentials: {
-    username: 'TYPE HERE YOUR CARTO USERNAME',
+    username: 'victor-carto',
     apiKey: 'default_public',
     serverUrlTemplate: 'https://{user}.carto.com',
   },
